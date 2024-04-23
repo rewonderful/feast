@@ -8,7 +8,7 @@ import pandas as pd
 import pyarrow as pa
 from jinja2 import BaseLoader, Environment
 from pandas import Timestamp
-
+import os
 from feast.data_source import DataSource
 from feast.errors import (
     EntityTimestampInferenceException,
@@ -59,6 +59,7 @@ def assert_expected_columns_in_entity_df(
 
 # TODO: Remove project and registry from the interface and call sites.
 def get_expected_join_keys(
+    #todo xdh
     project: str, feature_views: List[FeatureView], registry: BaseRegistry
 ) -> Set[str]:
     join_keys = set()
@@ -104,6 +105,7 @@ def get_feature_view_query_context(
     registry: BaseRegistry,
     project: str,
     entity_df_timestamp_range: Tuple[datetime, datetime],
+    fs_join_on=None
 ) -> List[FeatureViewQueryContext]:
     """
     Build a query context containing all information required to template a BigQuery and
@@ -115,18 +117,31 @@ def get_feature_view_query_context(
     ) = _get_requested_feature_views_to_features_dict(
         feature_refs, feature_views, registry.list_on_demand_feature_views(project)
     )
+    fs_join_on = os.environ.get("FEAST_JOIN_ON", "")
+    fs_join_on = fs_join_on.split(",")
+    fs_join_on = set(fs_join_on)
+    print(f"offlin_utils: FEAST_JOIN_ON:{fs_join_on}")
 
     query_context = []
     for feature_view, features in feature_views_to_feature_map.items():
         join_keys: List[str] = []
         entity_selections: List[str] = []
+        fv_all_keys = []
         for entity_column in feature_view.entity_columns:
+            #todo xdh
+            #这里也是导致多个id不能one of的原因
             join_key = feature_view.projection.join_key_map.get(
                 entity_column.name, entity_column.name
             )
-            join_keys.append(join_key)
-            entity_selections.append(f"{entity_column.name} AS {join_key}")
+            fv_all_keys.append(join_key)
+            if join_key in fs_join_on:
+                join_keys.append(join_key)
+                entity_selections.append(f"{entity_column.name} AS {join_key}")
+        diff = set(join_keys) - set(fs_join_on)
+        if len(join_keys) == 0 or len(diff) !=0:
+            raise Exception(f"key miss in :{feature_view.name},expected keys:{fs_join_on} but got:{fv_all_keys}")
 
+        print(f"sql join_keys:{join_keys} entity_selections:{entity_selections}")
         if isinstance(feature_view.ttl, timedelta):
             ttl_seconds = int(feature_view.ttl.total_seconds())
         else:
@@ -217,9 +232,9 @@ def build_point_in_time_query(
     return query
 
 
-def get_temp_entity_table_name() -> str:
+def get_temp_entity_table_name(suffix="") -> str:
     """Returns a random table name for uploading the entity dataframe"""
-    return "feast_entity_df_" + uuid.uuid4().hex
+    return f"feast_entity_df_{suffix}_" + uuid.uuid4().hex
 
 
 def get_offline_store_from_config(offline_store_config: Any) -> OfflineStore:
