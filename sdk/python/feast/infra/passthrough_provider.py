@@ -262,6 +262,7 @@ class PassthroughProvider(Provider):
         registry: BaseRegistry,
         project: str,
         full_feature_names: bool,
+        **kwargs,
     ) -> RetrievalJob:
         set_usage_attribute("provider", self.__class__.__name__)
 
@@ -273,6 +274,7 @@ class PassthroughProvider(Provider):
             registry=registry,
             project=project,
             full_feature_names=full_feature_names,
+            **kwargs,
         )
 
         return job
