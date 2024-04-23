@@ -175,12 +175,21 @@ class SparkSource(DataSource):
         if spark_session is None:
             raise AssertionError("Could not find an active spark session.")
         try:
-            df = spark_session.read.format(self.file_format).load(self.path)
+            start_date = getattr(self,"_start_date",None,)
+            print(f"load path:{self.path},start_date:{start_date}")
+            if self.file_format == "parquet":
+                df = spark_session.read.parquet(self.path)
+            else:
+                #源码
+                df = spark_session.read.format(self.file_format).load(self.path)
         except Exception:
             logger.exception(
                 "Spark read of file source failed.\n" + traceback.format_exc()
             )
-        tmp_table_name = get_temp_entity_table_name()
+
+        tmp_table_name = get_temp_entity_table_name(self.name)
+        print(f"{self.name}.tmp_table_name:{tmp_table_name}")
+        # df = df.select("xxx")
         df.createOrReplaceTempView(tmp_table_name)
 
         return f"`{tmp_table_name}`"
