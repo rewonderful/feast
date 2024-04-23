@@ -1018,6 +1018,7 @@ class FeatureStore:
         entity_df: Union[pd.DataFrame, str],
         features: Union[List[str], FeatureService],
         full_feature_names: bool = False,
+            **kwargs,
     ) -> RetrievalJob:
         """Enrich an entity dataframe with historical feature values for either training or batch scoring.
 
@@ -1088,6 +1089,9 @@ class FeatureStore:
                 "Please use request data source instead",
                 DeprecationWarning,
             )
+        primary_key = kwargs.get("primary_key",None)
+        print(f"primary_key:{primary_key}")
+        os.environ["FEAST_JOIN_ON"] = primary_key
 
         # TODO(achal): _group_feature_refs returns the on demand feature views, but it's not passed into the provider.
         # This is a weird interface quirk - we should revisit the `get_historical_features` to
@@ -1138,6 +1142,7 @@ class FeatureStore:
             self._registry,
             self.project,
             full_feature_names,
+            primary_key=primary_key,
         )
 
         return job
