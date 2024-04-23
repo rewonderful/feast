@@ -129,16 +129,19 @@ class SparkOfflineStore(OfflineStore):
         registry: Registry,
         project: str,
         full_feature_names: bool = False,
+            **kwargs,
     ) -> RetrievalJob:
         assert isinstance(config.offline_store, SparkOfflineStoreConfig)
         for fv in feature_views:
             assert isinstance(fv.batch_source, SparkSource)
-
+        print("im edit anyway !!")
         warnings.warn(
             "The spark offline store is an experimental feature in alpha development. "
             "Some functionality may still be unstable so functionality can change in the future.",
             RuntimeWarning,
         )
+        primary_key = kwargs.get("primary_key",None)
+        print(f"in spark stote: primary_key:{primary_key}")
 
         spark_session = get_spark_session_or_start_new_with_repoconfig(
             store_config=config.offline_store
@@ -164,9 +167,18 @@ class SparkOfflineStore(OfflineStore):
             event_timestamp_col=event_timestamp_col,
         )
 
-        expected_join_keys = offline_utils.get_expected_join_keys(
-            project=project, feature_views=feature_views, registry=registry
-        )
+
+
+        if isinstance(primary_key,str):
+            expected_join_keys = {primary_key}
+        elif isinstance(primary_key,(list,tuple)):
+            expected_join_keys = set(primary_key)
+        else:
+            expected_join_keys = offline_utils.get_expected_join_keys(
+                project=project, feature_views=feature_views, registry=registry
+            )
+        print(f"expected_join_keys:{expected_join_keys}")
+        # expected_join_keys = {"cmid"}
         offline_utils.assert_expected_columns_in_entity_df(
             entity_schema=entity_schema,
             join_keys=expected_join_keys,
@@ -189,7 +201,8 @@ class SparkOfflineStore(OfflineStore):
             query_template=MULTIPLE_FEATURE_VIEW_POINT_IN_TIME_JOIN,
             full_feature_names=full_feature_names,
         )
-
+        print(f"FINAL SQL:\n{query}")
+        print(f"="*100)
         return SparkRetrievalJob(
             spark_session=spark_session,
             query=query,
