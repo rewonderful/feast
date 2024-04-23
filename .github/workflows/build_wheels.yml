@@ -76,6 +76,18 @@ jobs:
         with:
           name: wheels
           path: ./wheelhouse/*.whl
+       #addXDH
+      - name: Archive wheel file  
+        id: archive-wheel  
+        if: always()  
+        run: |  
+          zip -r wheel-artifact.zip ./wheelhouse/*.whl
+          echo "::set-output name=artifact_path::wheel-artifact.zip"  
+      - name: Upload wheel file  
+        uses: actions/upload-artifact@v2  
+        with:  
+          name: python-wheel  
+          path: ${{ steps.archive-wheel.outputs.artifact_path }}
 
   build-source-distribution:
     name: Build source distribution
